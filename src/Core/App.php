@@ -7,6 +7,7 @@ namespace App\Core;
 use App\Config\Config;
 use App\Database\Connection;
 use App\Http\Controller\ResourceController;
+use App\Http\OpenApiSpec;
 
 // Repositories
 use App\Domain\Repository\AfiliadoRepository;
@@ -104,6 +105,14 @@ final class App
                 return $this->healthCheck();
             }
 
+            if ($method === 'GET' && $path === '/docs/openapi.json') {
+                return ['status' => 200, 'body' => OpenApiSpec::generate()];
+            }
+
+            if ($method === 'GET' && ($path === '/docs' || $path === '/docs/')) {
+                return ['status' => 200, 'content_type' => 'text/html; charset=utf-8', 'body' => $this->swaggerUiHtml()];
+            }
+
             return $this->dispatch($method, $path);
         } catch (Throwable $exception) {
             return ErrorHandler::toApiResponse($exception, Config::isDebug());
@@ -183,5 +192,42 @@ final class App
                 'mysql_version' => $dbVersion,
             ],
         ];
+    }
+
+    /** Devuelve el HTML de Swagger UI apuntando al spec generado por esta misma API. */
+    private function swaggerUiHtml(): string
+    {
+        return <<<'HTML'
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FitLife API — Documentación</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+  <style>
+    body { margin: 0; }
+    #swagger-ui .topbar { background-color: #1a1a2e; }
+    #swagger-ui .topbar .topbar-wrapper .link { display: none; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    SwaggerUIBundle({
+      url: '/docs/openapi.json',
+      dom_id: '#swagger-ui',
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+      layout: 'BaseLayout',
+      deepLinking: true,
+      displayRequestDuration: true,
+      filter: true,
+      tryItOutEnabled: true,
+    });
+  </script>
+</body>
+</html>
+HTML;
     }
 }

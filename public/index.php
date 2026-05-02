@@ -13,8 +13,15 @@ $response = $app->handleRequest($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['R
 
 // Establece el codigo de estado HTTP devuelto por la capa de aplicacion.
 http_response_code($response['status']);
-// Fuerza salida JSON UTF-8 para mantener una API consistente.
-header('Content-Type: application/json; charset=utf-8');
 
-// Serializa el cuerpo de respuesta en JSON legible para pruebas locales.
-echo json_encode($response['body'], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+// Selecciona el Content-Type segun lo que indique la respuesta (JSON por defecto).
+$contentType = $response['content_type'] ?? 'application/json; charset=utf-8';
+header('Content-Type: ' . $contentType);
+
+if ($contentType === 'text/html; charset=utf-8') {
+    // Respuesta HTML (ej. Swagger UI).
+    echo $response['body'];
+} else {
+    // Serializa el cuerpo de respuesta en JSON legible para pruebas locales.
+    echo json_encode($response['body'], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+}
