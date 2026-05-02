@@ -94,6 +94,7 @@ final class App
     public function handleRequest(string $method, string $uri): array
     {
         $path = parse_url($uri, PHP_URL_PATH) ?? '/';
+        $query = parse_url($uri, PHP_URL_QUERY) ?? '';
 
         // Normaliza: elimina barra final salvo en raiz.
         if ($path !== '/' && str_ends_with($path, '/')) {
@@ -113,14 +114,14 @@ final class App
                 return ['status' => 200, 'content_type' => 'text/html; charset=utf-8', 'body' => $this->swaggerUiHtml()];
             }
 
-            return $this->dispatch($method, $path);
+            return $this->dispatch($method, $path, $this->parseQueryParams($query));
         } catch (Throwable $exception) {
             return ErrorHandler::toApiResponse($exception, Config::isDebug());
         }
     }
 
     /** @return array{status:int, body:array<string, mixed>} */
-    private function dispatch(string $method, string $path): array
+    private function dispatch(string $method, string $path, array $queryParams = []): array
     {
         // Descompone la ruta en segmentos significativos (ignora el primer '/').
         $segments = array_values(array_filter(explode('/', $path)));
@@ -144,7 +145,7 @@ final class App
         $controller = $this->makeController($resource);
 
         return match (true) {
-            $method === 'GET'    && $id === null => $controller->index(),
+            $method === 'GET'    && $id === null => $controller->index($queryParams),
             $method === 'GET'    && $id !== null => $controller->show($id),
             $method === 'POST'   && $id === null => $controller->store($this->parseBody()),
             $method === 'PUT'    && $id !== null => $controller->replace($id, $this->parseBody()),
@@ -176,6 +177,20 @@ final class App
         $decoded = json_decode($raw, true);
 
         return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function parseQueryParams(string $query): array
+    {
+        if ($query === '') {
+            return [];
+        }
+
+        parse_str($query, $params);
+
+        return is_array($params) ? $params : [];
     }
 
     /** @return array{status:int, body:array<string, mixed>} */

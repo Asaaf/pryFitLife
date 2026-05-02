@@ -136,6 +136,29 @@ final class OpenApiSpec
                     'tags'        => [$tag],
                     'summary'     => "Listar {$tag}",
                     'operationId' => "list{$pascal}",
+                    'parameters'  => [
+                        [
+                            'name' => 'page',
+                            'in' => 'query',
+                            'required' => false,
+                            'schema' => ['type' => 'integer', 'minimum' => 1, 'example' => 1],
+                            'description' => 'Numero de pagina a consultar. Debe enviarse junto con per_page.',
+                        ],
+                        [
+                            'name' => 'per_page',
+                            'in' => 'query',
+                            'required' => false,
+                            'schema' => ['type' => 'integer', 'minimum' => 1, 'example' => 10],
+                            'description' => 'Cantidad de registros por pagina. Debe enviarse junto con page.',
+                        ],
+                        [
+                            'name' => 'q',
+                            'in' => 'query',
+                            'required' => false,
+                            'schema' => ['type' => 'string', 'example' => 'col'],
+                            'description' => 'Filtro de busqueda opcional aplicado sobre las columnas del recurso.',
+                        ],
+                    ],
                     'responses'   => [
                         '200' => [
                             'description' => 'Listado exitoso',
@@ -143,6 +166,17 @@ final class OpenApiSpec
                                 'type'       => 'object',
                                 'properties' => [
                                     'data' => ['type' => 'array', 'items' => $schemaRef],
+                                    'meta' => [
+                                        'type' => 'object',
+                                        'nullable' => true,
+                                        'properties' => [
+                                            'total' => ['type' => 'integer', 'example' => 250],
+                                            'page' => ['type' => 'integer', 'example' => 1],
+                                            'per_page' => ['type' => 'integer', 'example' => 10],
+                                            'total_pages' => ['type' => 'integer', 'example' => 25],
+                                            'query' => ['type' => 'string', 'nullable' => true, 'example' => 'col'],
+                                        ],
+                                    ],
                                 ],
                             ]]],
                         ],

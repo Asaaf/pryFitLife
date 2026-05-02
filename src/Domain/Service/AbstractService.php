@@ -31,6 +31,22 @@ abstract class AbstractService implements ServiceInterface
     }
 
     /**
+     * @return array{items:list<TEntity>, total:int, page:int, per_page:int, total_pages:int}
+     */
+    public function getPage(int $page, int $perPage, ?string $query = null): array
+    {
+        if ($page <= 0) {
+            throw new InvalidArgumentException('El parametro page debe ser un entero positivo.');
+        }
+
+        if ($perPage <= 0) {
+            throw new InvalidArgumentException('El parametro per_page debe ser un entero positivo.');
+        }
+
+        return $this->repository->findPage($page, $perPage, $query);
+    }
+
+    /**
      * @return TEntity|null
      */
     public function getById(int $id): ?EntityInterface

@@ -19,17 +19,56 @@ final class ResourceController
     public function __construct(private readonly ServiceInterface $service) {}
 
     // GET /resource
-    public function index(): array
+    public function index(array $queryParams = []): array
     {
-        $items = $this->service->getAll();
+        $page = $this->readPositiveInt($queryParams['page'] ?? null);
+        $perPage = $this->readPositiveInt($queryParams['per_page'] ?? null);
+        $query = isset($queryParams['q']) ? trim((string) $queryParams['q']) : null;
+
+        if ($page === null && $perPage === null && ($query === null || $query === '')) {
+            $items = $this->service->getAll();
+
+            return [
+                'status' => 200,
+                'body' => [
+                    'data' => array_map(
+                        static fn(EntityInterface $e): array => $e->toArray(),
+                        $items,
+                    ),
+                ],
+            ];
+        }
+
+        if (($page === null) !== ($perPage === null)) {
+            return [
+                'status' => 400,
+                'body' => ['message' => 'Los parametros page y per_page deben enviarse juntos.'],
+            ];
+        }
+
+        try {
+            $result = $this->service->getPage($page ?? 1, $perPage ?? 10, $query);
+        } catch (InvalidArgumentException $e) {
+            return [
+                'status' => 400,
+                'body' => ['message' => $e->getMessage()],
+            ];
+        }
 
         return [
             'status' => 200,
             'body' => [
                 'data' => array_map(
                     static fn(EntityInterface $e): array => $e->toArray(),
-                    $items,
+                    $result['items'],
                 ),
+                'meta' => [
+                    'total' => $result['total'],
+                    'page' => $result['page'],
+                    'per_page' => $result['per_page'],
+                    'total_pages' => $result['total_pages'],
+                    'query' => $query,
+                ],
             ],
         ];
     }
@@ -114,5 +153,20 @@ final class ResourceController
             'status' => 200,
             'body' => ['message' => 'Recurso eliminado exitosamente.'],
         ];
+    }
+
+    private function readPositiveInt(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_array($value) || !ctype_digit((string) $value)) {
+            throw new InvalidArgumentException('Los parametros de paginacion deben ser enteros positivos.');
+        }
+
+        $number = (int) $value;
+
+        return $number > 0 ? $number : null;
     }
 }

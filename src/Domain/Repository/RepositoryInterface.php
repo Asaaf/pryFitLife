@@ -17,6 +17,11 @@ interface RepositoryInterface
     public function findAll(): array;
 
     /**
+     * @return array{items:list<TEntity>, total:int, page:int, per_page:int, total_pages:int}
+     */
+    public function findPage(int $page, int $perPage, ?string $query = null): array;
+
+    /**
      * @return TEntity|null
      */
     public function findById(int $id): ?EntityInterface;

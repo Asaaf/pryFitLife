@@ -164,29 +164,12 @@ export function createCrudPage(config) {
 
   async function init() {
     let items         = [];
-    let filteredItems = [];
     let related       = {};
     let currentPage   = 1;
     let pageSize      = 10;
-
-    function filterItems(query) {
-      const normalizedQuery = query.toLowerCase().trim();
-      return normalizedQuery
-        ? items.filter(item => Object.values(item).join(' ').toLowerCase().includes(normalizedQuery))
-        : items;
-    }
-
-    function totalPagesFor(data) {
-      return Math.max(1, Math.ceil(data.length / pageSize));
-    }
-
-    function currentPageItems(data) {
-      const totalPages = totalPagesFor(data);
-      currentPage = Math.min(Math.max(currentPage, 1), totalPages);
-
-      const startIndex = (currentPage - 1) * pageSize;
-      return data.slice(startIndex, startIndex + pageSize);
-    }
+    let searchQuery   = '';
+    let totalItems    = 0;
+    let totalPages    = 1;
 
     function updatePagination(dataLength) {
       const summary = document.getElementById('paginationSummary');
@@ -194,22 +177,21 @@ export function createCrudPage(config) {
       const btnPrev = document.getElementById('btnPrevPage');
       const btnNext = document.getElementById('btnNextPage');
 
-      const totalPages = totalPagesFor(filteredItems);
       const start = dataLength === 0 ? 0 : ((currentPage - 1) * pageSize) + 1;
       const end   = dataLength === 0 ? 0 : start + dataLength - 1;
 
       if (summary) {
         summary.textContent = dataLength === 0
           ? 'Mostrando 0 registros'
-          : `Mostrando ${start}-${end} de ${filteredItems.length} registros`;
+          : `Mostrando ${start}-${end} de ${totalItems} registros`;
       }
 
       if (status) {
         status.textContent = `Página ${totalPages === 0 ? 1 : currentPage} de ${totalPages}`;
       }
 
-      if (btnPrev) btnPrev.disabled = currentPage <= 1 || filteredItems.length === 0;
-      if (btnNext) btnNext.disabled = currentPage >= totalPages || filteredItems.length === 0;
+      if (btnPrev) btnPrev.disabled = currentPage <= 1 || totalItems === 0;
+      if (btnNext) btnNext.disabled = currentPage >= totalPages || totalItems === 0;
     }
 
     // Precarga datos relacionados para el modal (una sola vez).
@@ -218,28 +200,37 @@ export function createCrudPage(config) {
     }
 
     async function load() {
-      const res = await api.get(endpoint);
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        per_page: String(pageSize),
+      });
+
+      if (searchQuery) {
+        params.set('q', searchQuery);
+      }
+
+      const res = await api.get(`${endpoint}?${params.toString()}`);
       if (!res.ok) { showToast(res.error, 'error'); return; }
       items = Array.isArray(res.data) ? res.data : [];
-      filteredItems = items;
-      currentPage = 1;
-      renderTable(filteredItems);
+      totalItems = Number(res.meta?.total ?? items.length);
+      totalPages = Math.max(1, Number(res.meta?.total_pages ?? 1));
+      currentPage = Math.min(Math.max(1, Number(res.meta?.page ?? currentPage)), totalPages);
+      renderTable(items);
     }
 
     function renderTable(data) {
       const tbody       = document.getElementById('crudTbody');
       const rowCount    = document.getElementById('rowCount');
-      const visibleRows = currentPageItems(data);
 
       if (tbody) {
-        tbody.innerHTML = buildRows(visibleRows);
+        tbody.innerHTML = buildRows(data);
       }
 
       if (rowCount) {
-        rowCount.textContent = `${data.length} registro${data.length !== 1 ? 's' : ''}`;
+        rowCount.textContent = `${totalItems} registro${totalItems !== 1 ? 's' : ''}`;
       }
 
-      updatePagination(visibleRows.length);
+      updatePagination(data.length);
     }
 
     function prepareModal(item = null) {
@@ -299,27 +290,27 @@ export function createCrudPage(config) {
 
     // Búsqueda en tiempo real (filtro local).
     document.getElementById('searchInput')?.addEventListener('input', e => {
-      filteredItems = filterItems(e.target.value);
+      searchQuery = e.target.value.trim();
       currentPage = 1;
-      renderTable(filteredItems);
+      load();
     });
 
     document.getElementById('pageSizeSelect')?.addEventListener('change', e => {
       pageSize = Number(e.target.value) || 10;
       currentPage = 1;
-      renderTable(filteredItems);
+      load();
     });
 
     document.getElementById('btnPrevPage')?.addEventListener('click', () => {
       if (currentPage <= 1) return;
       currentPage -= 1;
-      renderTable(filteredItems);
+      load();
     });
 
     document.getElementById('btnNextPage')?.addEventListener('click', () => {
-      if (currentPage >= totalPagesFor(filteredItems)) return;
+      if (currentPage >= totalPages) return;
       currentPage += 1;
-      renderTable(filteredItems);
+      load();
     });
 
     await load();

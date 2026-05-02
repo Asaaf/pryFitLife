@@ -17,6 +17,11 @@ interface ServiceInterface
     public function getAll(): array;
 
     /**
+     * @return array{items:list<TEntity>, total:int, page:int, per_page:int, total_pages:int}
+     */
+    public function getPage(int $page, int $perPage, ?string $query = null): array;
+
+    /**
      * @return TEntity|null
      */
     public function getById(int $id): ?EntityInterface;

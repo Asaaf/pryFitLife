@@ -15,12 +15,12 @@ async function request(method, path, body = null) {
 
     if (!res.ok) {
       const msg = json.message ?? json.errors?.[0] ?? `Error ${res.status}`;
-      return { ok: false, data: null, error: msg };
+      return { ok: false, data: null, meta: null, error: msg };
     }
 
-    return { ok: true, data: json.data ?? json, error: null };
+    return { ok: true, data: json.data ?? json, meta: json.meta ?? null, error: null };
   } catch (err) {
-    return { ok: false, data: null, error: err.message ?? 'Error de red' };
+    return { ok: false, data: null, meta: null, error: err.message ?? 'Error de red' };
   }
 }
 

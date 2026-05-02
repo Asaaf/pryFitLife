@@ -44,6 +44,52 @@ abstract class AbstractRepository implements RepositoryInterface
     }
 
     /**
+     * @return array{items:list<TEntity>, total:int, page:int, per_page:int, total_pages:int}
+     */
+    public function findPage(int $page, int $perPage, ?string $query = null): array
+    {
+        $page = max(1, $page);
+        $perPage = max(1, $perPage);
+        $offset = ($page - 1) * $perPage;
+
+        [$whereSql, $params] = $this->buildSearchClause($query);
+
+        $countSql = sprintf('SELECT COUNT(*) FROM %s%s', $this->tableName(), $whereSql);
+        $countStatement = $this->connection->prepare($countSql);
+        $countStatement->execute($params);
+        $total = (int) $countStatement->fetchColumn();
+
+        $sql = sprintf(
+            'SELECT * FROM %s%s ORDER BY id ASC LIMIT :limit OFFSET :offset',
+            $this->tableName(),
+            $whereSql,
+        );
+
+        $statement = $this->connection->prepare($sql);
+
+        foreach ($params as $name => $value) {
+            $statement->bindValue(':' . $name, $value, PDO::PARAM_STR);
+        }
+
+        $statement->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $statement->execute();
+
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $statement->fetchAll();
+        $entityClass = $this->entityClass();
+        $items = array_map(static fn (array $row): EntityInterface => $entityClass::fromArray($row), $rows);
+
+        return [
+            'items' => $items,
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
+            'total_pages' => max(1, (int) ceil($total / $perPage)),
+        ];
+    }
+
+    /**
      * @return TEntity|null
      */
     public function findById(int $id): ?EntityInterface
@@ -167,5 +213,42 @@ abstract class AbstractRepository implements RepositoryInterface
         $entityClass = $this->entityClass();
 
         return $entityClass::tableName();
+    }
+
+    /**
+     * @return array{0:string, 1:array<string, string>}
+     */
+    protected function buildSearchClause(?string $query): array
+    {
+        $query = trim((string) $query);
+
+        if ($query === '') {
+            return ['', []];
+        }
+
+        $conditions = [];
+        $params = [];
+
+        foreach ($this->searchableColumns() as $index => $column) {
+            $param = 'search_' . $index;
+            $conditions[] = sprintf('CAST(%s AS CHAR) LIKE :%s', $column, $param);
+            $params[$param] = '%' . $query . '%';
+        }
+
+        if ($conditions === []) {
+            return ['', []];
+        }
+
+        return [' WHERE ' . implode(' OR ', $conditions), $params];
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function searchableColumns(): array
+    {
+        $entityClass = $this->entityClass();
+
+        return $entityClass::columns();
     }
 }
