@@ -25,15 +25,15 @@ abstract class AbstractService implements ServiceInterface
     /**
      * @return list<TEntity>
      */
-    public function getAll(): array
+    public function getAll(array $filters = []): array
     {
-        return $this->repository->findAll();
+        return $this->repository->findAll($filters);
     }
 
     /**
      * @return array{items:list<TEntity>, total:int, page:int, per_page:int, total_pages:int}
      */
-    public function getPage(int $page, int $perPage, ?string $query = null): array
+    public function getPage(int $page, int $perPage, ?string $query = null, array $filters = []): array
     {
         if ($page <= 0) {
             throw new InvalidArgumentException('El parametro page debe ser un entero positivo.');
@@ -43,7 +43,7 @@ abstract class AbstractService implements ServiceInterface
             throw new InvalidArgumentException('El parametro per_page debe ser un entero positivo.');
         }
 
-        return $this->repository->findPage($page, $perPage, $query);
+        return $this->repository->findPage($page, $perPage, $query, $filters);
     }
 
     /**

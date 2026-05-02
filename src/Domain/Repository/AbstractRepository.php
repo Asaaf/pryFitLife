@@ -30,10 +30,12 @@ abstract class AbstractRepository implements RepositoryInterface
     /**
      * @return list<TEntity>
      */
-    public function findAll(): array
+    public function findAll(array $filters = []): array
     {
-        $sql = sprintf('SELECT * FROM %s', $this->tableName());
-        $statement = $this->connection->query($sql);
+        [$whereSql, $params] = $this->buildWhereClause(null, $filters);
+        $sql = sprintf('SELECT * FROM %s%s ORDER BY id ASC', $this->tableName(), $whereSql);
+        $statement = $this->connection->prepare($sql);
+        $statement->execute($params);
 
         /** @var list<array<string, mixed>> $rows */
         $rows = $statement->fetchAll();
@@ -46,13 +48,13 @@ abstract class AbstractRepository implements RepositoryInterface
     /**
      * @return array{items:list<TEntity>, total:int, page:int, per_page:int, total_pages:int}
      */
-    public function findPage(int $page, int $perPage, ?string $query = null): array
+    public function findPage(int $page, int $perPage, ?string $query = null, array $filters = []): array
     {
         $page = max(1, $page);
         $perPage = max(1, $perPage);
         $offset = ($page - 1) * $perPage;
 
-        [$whereSql, $params] = $this->buildSearchClause($query);
+        [$whereSql, $params] = $this->buildWhereClause($query, $filters);
 
         $countSql = sprintf('SELECT COUNT(*) FROM %s%s', $this->tableName(), $whereSql);
         $countStatement = $this->connection->prepare($countSql);
@@ -218,28 +220,37 @@ abstract class AbstractRepository implements RepositoryInterface
     /**
      * @return array{0:string, 1:array<string, string>}
      */
-    protected function buildSearchClause(?string $query): array
+    protected function buildWhereClause(?string $query, array $filters = []): array
     {
         $query = trim((string) $query);
-
-        if ($query === '') {
-            return ['', []];
-        }
-
-        $conditions = [];
+        $clauses = [];
         $params = [];
 
-        foreach ($this->searchableColumns() as $index => $column) {
-            $param = 'search_' . $index;
-            $conditions[] = sprintf('CAST(%s AS CHAR) LIKE :%s', $column, $param);
-            $params[$param] = '%' . $query . '%';
+        if ($query !== '') {
+            $conditions = [];
+
+            foreach ($this->searchableColumns() as $index => $column) {
+                $param = 'search_' . $index;
+                $conditions[] = sprintf('CAST(%s AS CHAR) LIKE :%s', $column, $param);
+                $params[$param] = '%' . $query . '%';
+            }
+
+            if ($conditions !== []) {
+                $clauses[] = '(' . implode(' OR ', $conditions) . ')';
+            }
         }
 
-        if ($conditions === []) {
+        foreach ($this->normalizedFilters($filters) as $column => $value) {
+            $param = 'filter_' . $column;
+            $clauses[] = sprintf('%s = :%s', $column, $param);
+            $params[$param] = $value;
+        }
+
+        if ($clauses === []) {
             return ['', []];
         }
 
-        return [' WHERE ' . implode(' OR ', $conditions), $params];
+        return [' WHERE ' . implode(' AND ', $clauses), $params];
     }
 
     /**
@@ -250,5 +261,32 @@ abstract class AbstractRepository implements RepositoryInterface
         $entityClass = $this->entityClass();
 
         return $entityClass::columns();
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, scalar>
+     */
+    protected function normalizedFilters(array $filters): array
+    {
+        $entityClass = $this->entityClass();
+        $allowed = array_flip($entityClass::columns());
+        $normalized = [];
+
+        foreach ($filters as $column => $value) {
+            if (!is_string($column) || !isset($allowed[$column])) {
+                continue;
+            }
+
+            if (is_array($value) || $value === null || $value === '') {
+                continue;
+            }
+
+            if (is_scalar($value)) {
+                $normalized[$column] = $value;
+            }
+        }
+
+        return $normalized;
     }
 }

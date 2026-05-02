@@ -14,12 +14,12 @@ interface RepositoryInterface
     /**
      * @return list<TEntity>
      */
-    public function findAll(): array;
+    public function findAll(array $filters = []): array;
 
     /**
      * @return array{items:list<TEntity>, total:int, page:int, per_page:int, total_pages:int}
      */
-    public function findPage(int $page, int $perPage, ?string $query = null): array;
+    public function findPage(int $page, int $perPage, ?string $query = null, array $filters = []): array;
 
     /**
      * @return TEntity|null

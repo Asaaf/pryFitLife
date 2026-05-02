@@ -14,12 +14,12 @@ interface ServiceInterface
     /**
      * @return list<TEntity>
      */
-    public function getAll(): array;
+    public function getAll(array $filters = []): array;
 
     /**
      * @return array{items:list<TEntity>, total:int, page:int, per_page:int, total_pages:int}
      */
-    public function getPage(int $page, int $perPage, ?string $query = null): array;
+    public function getPage(int $page, int $perPage, ?string $query = null, array $filters = []): array;
 
     /**
      * @return TEntity|null

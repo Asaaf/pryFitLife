@@ -21,12 +21,14 @@ final class ResourceController
     // GET /resource
     public function index(array $queryParams = []): array
     {
+        $filters = $this->extractFilters($queryParams);
+
         $page = $this->readPositiveInt($queryParams['page'] ?? null);
         $perPage = $this->readPositiveInt($queryParams['per_page'] ?? null);
         $query = isset($queryParams['q']) ? trim((string) $queryParams['q']) : null;
 
         if ($page === null && $perPage === null && ($query === null || $query === '')) {
-            $items = $this->service->getAll();
+            $items = $this->service->getAll($filters);
 
             return [
                 'status' => 200,
@@ -47,7 +49,7 @@ final class ResourceController
         }
 
         try {
-            $result = $this->service->getPage($page ?? 1, $perPage ?? 10, $query);
+            $result = $this->service->getPage($page ?? 1, $perPage ?? 10, $query, $filters);
         } catch (InvalidArgumentException $e) {
             return [
                 'status' => 400,
@@ -168,5 +170,16 @@ final class ResourceController
         $number = (int) $value;
 
         return $number > 0 ? $number : null;
+    }
+
+    /**
+     * @param array<string, mixed> $queryParams
+     * @return array<string, mixed>
+     */
+    private function extractFilters(array $queryParams): array
+    {
+        unset($queryParams['page'], $queryParams['per_page'], $queryParams['q']);
+
+        return $queryParams;
     }
 }

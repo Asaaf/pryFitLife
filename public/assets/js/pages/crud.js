@@ -3,7 +3,7 @@
  *
  * Uso:
  *   import { createCrudPage } from './crud.js';
- *   export default createCrudPage({ endpoint, title, singular, columns, fields, formColumns?, loadRelated? });
+ *   export default createCrudPage({ endpoint, title, singular, columns, fields, formColumns?, loadRelated?, onModalReady? });
  *
  * config.columns  = [{ key, label, render? }]
  * config.fields   = [{ key, label, type, required?, options?, span2? }]
@@ -11,6 +11,7 @@
  *   Para selects dinámicos: { key, type: 'select' } sin options → se rellenan via loadRelated
  * config.formColumns  = 1 | 2  (default 2)
  * config.loadRelated  = async () => ({ fieldKey: [{ value, label }] })
+ * config.onModalReady = async ({ item, related, fields, setOptions, setValue, getValue }) => void
  */
 
 import { api }       from '../api.js';
@@ -95,6 +96,28 @@ export function createCrudPage(config) {
       if (el) data[f.key] = el.value;
     });
     return data;
+  }
+
+  function setSelectOptions(fieldKey, options, selectedValue = '') {
+    const select = document.getElementById(`field_${fieldKey}`);
+    if (!select) return;
+
+    select.innerHTML = [
+      '<option value="">— Seleccionar —</option>',
+      ...(options ?? []).map(o => `<option value="${esc(String(o.value))}" ${String(selectedValue) === String(o.value) ? 'selected' : ''}>${esc(o.label)}</option>`),
+    ].join('');
+  }
+
+  function setFieldValue(fieldKey, value) {
+    const field = document.getElementById(`field_${fieldKey}`);
+    if (field) {
+      field.value = value ?? '';
+    }
+  }
+
+  function getFieldValue(fieldKey) {
+    const field = document.getElementById(`field_${fieldKey}`);
+    return field ? field.value : '';
   }
 
   // ── MODAL HELPERS ──────────────────────────────────────────────────────────
@@ -238,6 +261,17 @@ export function createCrudPage(config) {
         ? `Editar ${singular}`
         : `Nuevo ${singular}`;
       document.getElementById('modalBody').innerHTML = buildForm(item, related);
+
+      if (config.onModalReady) {
+        config.onModalReady({
+          item,
+          related,
+          fields,
+          setOptions: setSelectOptions,
+          setValue: setFieldValue,
+          getValue: getFieldValue,
+        });
+      }
 
       // Reasigna el handler de guardado para evitar acumulación de listeners.
       document.getElementById('modalSave').onclick = async () => {
