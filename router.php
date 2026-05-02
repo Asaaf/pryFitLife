@@ -19,7 +19,13 @@ $requestPath = parse_url($requestUri, PHP_URL_PATH) ?? '/';
 // Ruta absoluta al archivo dentro de public/.
 $publicFile = __DIR__ . '/public' . $requestPath;
 
-if ($requestPath !== '/' && file_exists($publicFile) && !is_dir($publicFile)) {
+// Redirige la raiz al panel administrativo.
+if ($requestPath === '/') {
+    header('Location: /app.html', true, 302);
+    exit;
+}
+
+if (file_exists($publicFile) && !is_dir($publicFile)) {
     // Devuelve false para que el servidor sirva el archivo estatico sin modificaciones.
     return false;
 }
