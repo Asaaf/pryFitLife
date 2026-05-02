@@ -19,6 +19,7 @@ import { esc, showToast } from '../utils.js';
 export function createCrudPage(config) {
   const { endpoint, title, singular, columns, fields } = config;
   const formColumns   = config.formColumns ?? 2;
+  const pageSizeOptions = [10, 20, 50, 100];
 
   // ── RENDERING HELPERS ──────────────────────────────────────────────────────
 
@@ -127,6 +128,12 @@ export function createCrudPage(config) {
     <div class="card">
       <div class="card-toolbar">
         <input type="search" class="input-search" id="searchInput" placeholder="Buscar en ${esc(title).toLowerCase()}..." />
+        <label class="page-size-control" for="pageSizeSelect">
+          <span>Registros por página</span>
+          <select id="pageSizeSelect" class="input-select-inline">
+            ${pageSizeOptions.map(size => `<option value="${size}" ${size === 10 ? 'selected' : ''}>${size}</option>`).join('')}
+          </select>
+        </label>
         <span class="topbar__api-label" id="rowCount" style="margin-left:auto;color:var(--c-text-muted);font-size:.8rem"></span>
       </div>
       <div class="table-wrapper">
@@ -139,13 +146,71 @@ export function createCrudPage(config) {
           </tbody>
         </table>
       </div>
+      <div class="pagination-bar">
+        <span class="pagination-bar__summary" id="paginationSummary">Mostrando 0 registros</span>
+        <div class="pagination-controls">
+          <button class="btn btn--ghost" id="btnPrevPage" type="button">
+            <i class="bi bi-chevron-left"></i> Anterior
+          </button>
+          <span class="pagination-controls__status" id="pageStatus">Página 1 de 1</span>
+          <button class="btn btn--ghost" id="btnNextPage" type="button">
+            Siguiente <i class="bi bi-chevron-right"></i>
+          </button>
+        </div>
+      </div>
     </div>`;
 
   // ── INIT ──────────────────────────────────────────────────────────────────
 
   async function init() {
-    let items   = [];
-    let related = {};
+    let items         = [];
+    let filteredItems = [];
+    let related       = {};
+    let currentPage   = 1;
+    let pageSize      = 10;
+
+    function filterItems(query) {
+      const normalizedQuery = query.toLowerCase().trim();
+      return normalizedQuery
+        ? items.filter(item => Object.values(item).join(' ').toLowerCase().includes(normalizedQuery))
+        : items;
+    }
+
+    function totalPagesFor(data) {
+      return Math.max(1, Math.ceil(data.length / pageSize));
+    }
+
+    function currentPageItems(data) {
+      const totalPages = totalPagesFor(data);
+      currentPage = Math.min(Math.max(currentPage, 1), totalPages);
+
+      const startIndex = (currentPage - 1) * pageSize;
+      return data.slice(startIndex, startIndex + pageSize);
+    }
+
+    function updatePagination(dataLength) {
+      const summary = document.getElementById('paginationSummary');
+      const status  = document.getElementById('pageStatus');
+      const btnPrev = document.getElementById('btnPrevPage');
+      const btnNext = document.getElementById('btnNextPage');
+
+      const totalPages = totalPagesFor(filteredItems);
+      const start = dataLength === 0 ? 0 : ((currentPage - 1) * pageSize) + 1;
+      const end   = dataLength === 0 ? 0 : start + dataLength - 1;
+
+      if (summary) {
+        summary.textContent = dataLength === 0
+          ? 'Mostrando 0 registros'
+          : `Mostrando ${start}-${end} de ${filteredItems.length} registros`;
+      }
+
+      if (status) {
+        status.textContent = `Página ${totalPages === 0 ? 1 : currentPage} de ${totalPages}`;
+      }
+
+      if (btnPrev) btnPrev.disabled = currentPage <= 1 || filteredItems.length === 0;
+      if (btnNext) btnNext.disabled = currentPage >= totalPages || filteredItems.length === 0;
+    }
 
     // Precarga datos relacionados para el modal (una sola vez).
     if (config.loadRelated) {
@@ -156,14 +221,25 @@ export function createCrudPage(config) {
       const res = await api.get(endpoint);
       if (!res.ok) { showToast(res.error, 'error'); return; }
       items = Array.isArray(res.data) ? res.data : [];
-      renderTable(items);
+      filteredItems = items;
+      currentPage = 1;
+      renderTable(filteredItems);
     }
 
     function renderTable(data) {
-      const tbody    = document.getElementById('crudTbody');
-      const rowCount = document.getElementById('rowCount');
-      if (tbody)    tbody.innerHTML = buildRows(data);
-      if (rowCount) rowCount.textContent = `${data.length} registro${data.length !== 1 ? 's' : ''}`;
+      const tbody       = document.getElementById('crudTbody');
+      const rowCount    = document.getElementById('rowCount');
+      const visibleRows = currentPageItems(data);
+
+      if (tbody) {
+        tbody.innerHTML = buildRows(visibleRows);
+      }
+
+      if (rowCount) {
+        rowCount.textContent = `${data.length} registro${data.length !== 1 ? 's' : ''}`;
+      }
+
+      updatePagination(visibleRows.length);
     }
 
     function prepareModal(item = null) {
@@ -223,11 +299,27 @@ export function createCrudPage(config) {
 
     // Búsqueda en tiempo real (filtro local).
     document.getElementById('searchInput')?.addEventListener('input', e => {
-      const q = e.target.value.toLowerCase().trim();
-      const filtered = q
-        ? items.filter(item => Object.values(item).join(' ').toLowerCase().includes(q))
-        : items;
-      renderTable(filtered);
+      filteredItems = filterItems(e.target.value);
+      currentPage = 1;
+      renderTable(filteredItems);
+    });
+
+    document.getElementById('pageSizeSelect')?.addEventListener('change', e => {
+      pageSize = Number(e.target.value) || 10;
+      currentPage = 1;
+      renderTable(filteredItems);
+    });
+
+    document.getElementById('btnPrevPage')?.addEventListener('click', () => {
+      if (currentPage <= 1) return;
+      currentPage -= 1;
+      renderTable(filteredItems);
+    });
+
+    document.getElementById('btnNextPage')?.addEventListener('click', () => {
+      if (currentPage >= totalPagesFor(filteredItems)) return;
+      currentPage += 1;
+      renderTable(filteredItems);
     });
 
     await load();
