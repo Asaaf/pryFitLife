@@ -1,0 +1,13 @@
+# Environment
+.env
+
+# Dependencies
+vendor/
+
+# Runtime artifacts
+storage/logs/*.log
+
+# IDE/OS
+.vscode/
+.DS_Store
+Thumbs.db

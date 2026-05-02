@@ -1,0 +1,25 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Domain\Entity;
+
+interface EntityInterface
+{
+    public static function tableName(): string;
+
+    /**
+     * @return list<string>
+     */
+    public static function columns(): array;
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    public static function fromArray(array $data): static;
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(): array;
+}
