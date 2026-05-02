@@ -80,6 +80,26 @@ src/
       Sede.php
       Seguimiento.php
       TipoDocumento.php
+    Repository/
+      AbstractRepository.php
+      RepositoryInterface.php
+      AfiliadoRepository.php
+      CiudadRepository.php
+      ClaseGrupalRepository.php
+      EjercicioRepository.php
+      EjercicioRutinaRepository.php
+      EmpleadoRepository.php
+      EspecialidadRepository.php
+      EstadoRepository.php
+      HorarioRepository.php
+      PagoRepository.php
+      PaisRepository.php
+      PlanRepository.php
+      PlanNutricionalRepository.php
+      RutinaRepository.php
+      SedeRepository.php
+      SeguimientoRepository.php
+      TipoDocumentoRepository.php
 storage/
   logs/
 tests/
@@ -100,3 +120,14 @@ Tablas cubiertas: `paises`, `estados`, `ciudades`, `sedes`, `especialidades`,
 `tipos_documento`, `empleados`, `planes_nutricionales`, `rutinas`, `afiliados`,
 `planes`, `pagos`, `ejercicios`, `clases_grupales`, `horarios`, `seguimientos`,
 `ejercicios_rutina`.
+
+## Repositorio base generico (CRUD)
+
+La capa `Domain/Repository` incluye un repositorio base reutilizable para todas
+las entidades. Cada repositorio concreto define su entidad y hereda metodos CRUD:
+
+- `findAll()`
+- `findById(int $id)`
+- `create(EntityInterface $entity)`
+- `update(int $id, EntityInterface $entity)`
+- `delete(int $id)`
